@@ -1,4 +1,4 @@
-import { createAccount, createMint } from "@solana/spl-token"
+import { createAccount, createMint, mintTo, getAssociatedTokenAddressSync, transfer, burn } from "@solana/spl-token"
 import { clusterApiUrl, Connection, Keypair } from "@solana/web3.js";
 const fs = require("fs")
 
@@ -17,12 +17,28 @@ async function main() {
     const secretTokAcc = JSON.parse(fs.readFileSync("ToAQVgJopqURyYXoWaN6DB7hQXdo8hc5PPHkdZSRULd.json").toString()) as number[]
     const secretKeyTokAcc = Uint8Array.from(secretTokAcc)
     const tokenAccKeypair = Keypair.fromSecretKey(secretKeyTokAcc)
-    
-    //const tokenMintAddress = await createMint(connection, payer, payer.publicKey, payer.publicKey, 9, tokenKeypair);
-    //console.log(tokenMintAddress.toBase58())
+    const mint = tokenKeypair.publicKey;
+    const ta = tokenAccKeypair.publicKey;
 
-    const ta = await createAccount(connection, payer, tokenKeypair.publicKey, payer.publicKey, tokenAccKeypair);
-    console.log(ta.toBase58());
+    const decimals = 9;
+    
+    // const tokenMintAddress = await createMint(connection, payer, payer.publicKey, payer.publicKey, 9, tokenKeypair);
+    // console.log(tokenMintAddress.toBase58())
+
+    // const ta = await createAccount(connection, payer, tokenKeypair.publicKey, payer.publicKey);
+    // console.log(ta.toBase58());
+
+    const ata = getAssociatedTokenAddressSync(tokenKeypair.publicKey, payer.publicKey);
+
+    // const amount = 3*10**decimals;
+    // const sigx = await mintTo(connection, payer, mint, ata, payer.publicKey, amount)
+    // console.log(sigx)
+
+    // const sigx = await transfer(connection, payer, ata, ta, payer.publicKey, 10**9)
+    // console.log(sigx)
+
+    const sigx = await burn(connection, payer, ata, mint, payer.publicKey, 10**9)
+    console.log(sigx)
 }
 
 main();
