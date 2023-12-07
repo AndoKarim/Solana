@@ -78,20 +78,60 @@ async function main() {
     const tx3 = new Transaction().add(createTokenAccountPoolInstruction, initializeTokenAccountPoolInstruction);
     await sendAndConfirmTransaction(connection, tx3, [wallet, tokenAccountPool]);
 
-    const tokenAMint = new PublicKey("GYJXeCV9A9qD8f6gebBp34rnL4DuFBRToQFtfx3SwaQe");
+    const tokenAMint = new PublicKey("4BCmPUpUT6dtZcVFHR3gKTVrG1xEx2SbijnmzZYtt17S");
     const [tokenATokenAccount, taci] = await getTokenAccountCreationInstruction(tokenAMint, swapAuthority, wallet.publicKey);
     const tx4 = new Transaction().add(taci);
     await sendAndConfirmTransaction(connection, tx4, [wallet]);
 
-    const tokenBMint = new PublicKey("8FEihGfTQStJzvs16YvV5uDo2x1wnzHFen86F2s911n9");
+    const tokenBMint = new PublicKey("fT1yvHxNkPuwNoNkDbUj6CDxc9cyLhP8jqodZzJeQzP");
     const [tokenBTokenAccount, tbci] = await getTokenAccountCreationInstruction(tokenBMint, swapAuthority, wallet.publicKey);
     const tx5 = new Transaction().add(tbci);
     await sendAndConfirmTransaction(connection, tx5, [wallet]);
 
+    const senderTokenAATA = await token.getAssociatedTokenAddress(tokenAMint, wallet.publicKey);
+    const amount = 500;
+    const decimals = 2;
+    const tx6 = new Transaction().add(token.createAssociatedTokenAccountInstruction(
+          wallet.publicKey,
+          tokenATokenAccount,
+          swapAuthority,
+          tokenAMint
+      ))
+    await sendAndConfirmTransaction(connection, tx6, [wallet]);
+    let tx7 = new Transaction().add(token.createTransferCheckedInstruction(
+        senderTokenAATA,
+        tokenAMint,
+        tokenATokenAccount,
+        wallet.publicKey,
+        amount * 10 ** decimals,
+        decimals
+      ));
+    await sendAndConfirmTransaction(connection, tx7, [wallet]);
+
+    const senderTokenBATA = await token.getAssociatedTokenAddress(tokenBMint, wallet.publicKey);
+    const amount2 = 500;
+    const decimals2 = 2;
+    const tx8 = new Transaction().add(token.createAssociatedTokenAccountInstruction(
+          wallet.publicKey,
+          tokenBTokenAccount,
+          swapAuthority,
+          tokenBMint
+      ))
+    await sendAndConfirmTransaction(connection, tx8, [wallet]);
+    let tx9 = new Transaction().add(token.createTransferCheckedInstruction(
+        senderTokenBATA,
+        tokenBMint,
+        tokenBTokenAccount,
+        wallet.publicKey,
+        amount2 * 10 ** decimals2,
+        decimals2
+      ));
+    await sendAndConfirmTransaction(connection, tx9, [wallet]);
+
     const feeOwner = new PublicKey("HfoTxFR1Tm6kGmWgYWD6J7YHVy1UwqSULUGVLXkJqaKN");
     const [tokenFeeAccountAddress, tfaci] = await getTokenAccountCreationInstruction(poolTokenMint.publicKey, feeOwner, wallet.publicKey);
-    const tx6 = new Transaction().add(tfaci);
-    await sendAndConfirmTransaction(connection, tx6, [wallet]);
+    const tx10 = new Transaction().add(tfaci);
+    await sendAndConfirmTransaction(connection, tx10, [wallet]);
 
     const tokenSwapInitSwapInstruction = TokenSwap.createInitSwapInstruction(
         tokenSwapStateAccount,
@@ -113,8 +153,8 @@ async function main() {
         BigInt(100),
         CurveType.ConstantProduct
     )
-    const tx7 = new Transaction().add(tokenSwapInitSwapInstruction);
-    await sendAndConfirmTransaction(connection, tx7, [wallet]);
+    const tx11 = new Transaction().add(tokenSwapInitSwapInstruction);
+    await sendAndConfirmTransaction(connection, tx11, [wallet]);
 
 }
 

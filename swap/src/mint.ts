@@ -22,9 +22,10 @@ async function main() {
     const connection = new Connection("https://api.devnet.solana.com");
     const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync("../json/dev_wallet.json").toString()) as number[]));
     const mint = Keypair.generate();
+    const transaction = new Transaction();
     const amount = 1000;
     const decimals = 9;
-    let tx = new Transaction().add(
+    let tx = (
         // create mint account
         SystemProgram.createAccount({
           fromPubkey: wallet.publicKey,
@@ -41,11 +42,11 @@ async function main() {
           null // freeze authority
         )
     );
-    await sendAndConfirmTransaction(connection, tx, [wallet, mint]);
-
+    transaction.add(tx);
     let [tx2, ata] = await buildCreateAssociatedTokenAccountTransaction(wallet.publicKey, mint.publicKey);
-    await sendAndConfirmTransaction(connection, tx2, [wallet]);
-    console.log("ata : "+ata);
+    transaction.add(tx2);
+    await sendAndConfirmTransaction(connection, transaction, [wallet, mint]);
+    console.log("ata : " + ata);
 
     await token.mintToChecked(
         connection, // connection
