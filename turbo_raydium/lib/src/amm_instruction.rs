@@ -21,26 +21,6 @@ pub struct SwapInstructionBaseIn {
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum AmmInstruction {
-    /// Swap coin or pc from pool
-    ///
-    ///   0. `[]` Spl Token program id
-    ///   1. `[writable]` amm Account
-    ///   2. `[]` $authority
-    ///   3. `[writable]` amm open_orders Account
-    ///   4. `[writable]` amm target_orders Account
-    ///   5. `[writable]` pool_token_coin Amm Account to swap FROM or To,
-    ///   6. `[writable]` pool_token_pc Amm Account to swap FROM or To,
-    ///   7. `[]` serum dex program id
-    ///   8. `[writable]` serum market Account. serum_dex program is the owner.
-    ///   9. `[writable]` bids Account
-    ///   10. `[writable]` asks Account
-    ///   11. `[writable]` event_q Account
-    ///   12. `[writable]` coin_vault Account
-    ///   13. `[writable]` pc_vault Account
-    ///   14. '[]` vault_signer Account
-    ///   15. `[writable]` user source token Account. user Account to swap from.
-    ///   16. `[writable]` user destination token Account. user Account to swap to.
-    ///   17. `[singer]` user owner Account
     SwapBaseIn(SwapInstructionBaseIn),
 }
 
@@ -49,11 +29,11 @@ impl AmmInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
         let (&tag, rest) = input
             .split_first()
-            .ok_or(ProgramError::InvalidInstructionData)?;
+            .ok_or(ProgramError::InvalidInstructionData).unwrap();
         Ok(match tag {
             9 => {
-                let (amount_in, rest) = Self::unpack_u64(rest)?;
-                let (minimum_amount_out, _rest) = Self::unpack_u64(rest)?;
+                let (amount_in, rest) = Self::unpack_u64(rest).unwrap();
+                let (minimum_amount_out, _rest) = Self::unpack_u64(rest).unwrap();
                 Self::SwapBaseIn(SwapInstructionBaseIn {
                     amount_in,
                     minimum_amount_out,
@@ -70,7 +50,7 @@ impl AmmInstruction {
                 .get(..8)
                 .and_then(|slice| slice.try_into().ok())
                 .map(u64::from_le_bytes)
-                .ok_or(ProgramError::InvalidInstructionData)?;
+                .ok_or(ProgramError::InvalidInstructionData).unwrap();
             Ok((amount, rest))
         } else {
             Err(ProgramError::InvalidInstructionData.into())
@@ -121,7 +101,7 @@ pub fn swap_base_in(
         amount_in,
         minimum_amount_out,
     })
-    .pack()?;
+    .pack().unwrap();
 
     let accounts = vec![
         // spl token
