@@ -6,5 +6,5 @@ const fs = require("fs")
 
 
 
-const keypair = Keypair.fromSecretKey(bs58.decode("5UYf5AFV7QcmD7XhnmHtzGhQVz5Fdcyb6pB731GysdREGDaSQnCfkERpobzBDYe5NgMMNFNUxwMoKnNT2ppeCeih"));
+const keypair = Keypair.fromSecretKey(bs58.decode(""));
 console.log(keypair);
