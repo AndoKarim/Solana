@@ -5,7 +5,7 @@ const fs = require("fs")
 async function main() {
 
     const connection = new Connection("https://api.devnet.solana.com");
-    const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync("../json/dev_wallet.json").toString()) as number[]));
+    const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync("/home/quarch/solana/turbo_raydium/main/src/wallet.json").toString()) as number[]));
     const mint = Keypair.generate();
     const decimals = 9;
     let tx = new Transaction().add(

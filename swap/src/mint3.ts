@@ -5,9 +5,9 @@ const fs = require("fs")
 async function main() {
 
     const connection = new Connection("https://api.devnet.solana.com");
-    const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync("../json/dev_wallet.json").toString()) as number[]));
-    const mint = new PublicKey("fT1yvHxNkPuwNoNkDbUj6CDxc9cyLhP8jqodZzJeQzP");
-    const ata = new PublicKey("AL3edvzHxRhatZTjQeoujJc5v5bJsweMCCc37V3oVMYt");
+    const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync("/home/quarch/solana/turbo_raydium/main/src/wallet.json").toString()) as number[]));
+    const mint = new PublicKey("G8Q5ygi38AqgGaawGKMgMoux75M4fL6wApecQRdfeoTT");
+    const ata = new PublicKey("3eF7W436ZCCqirfz5SGEoXrLZtaXodFowSKVvysariLo");
     const amount = 1000;
     const decimals = 9;
     await token.mintToChecked(
