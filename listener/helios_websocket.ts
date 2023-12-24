@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import axios from 'axios';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
 
 const ws = new WebSocket('wss://atlas-mainnet.helius-rpc.com?api-key=c1d1d8ca-636c-4bcf-a903-2d5dd45818c0');
 const RaydiumLiquidityPoolV4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
@@ -9,23 +10,24 @@ const AssociatedTokenAccountProgram = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8
 const Sage = "SAGEqqFewepDHH6hMDcmWy7yjHPpyKLDnRXKb3Ki8e6";
 const SwitchBoardV2 = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f";
 const SysvarRent = "SysvarRent111111111111111111111111111111111";
+const RentProgram = "11111111111111111111111111111111";
 const Serum = "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX";
 const expectedLogPatterns = [
-    //NEXT IS SERUM INITIALIZE MARKET
-    // /^Program 11111111111111111111111111111111 invoke \[1\]$/,
-    // /^Program 11111111111111111111111111111111 success$/,
-    // /^Program 11111111111111111111111111111111 invoke \[1\]$/,
-    // /^Program 11111111111111111111111111111111 success$/,
-    // /^Program 11111111111111111111111111111111 invoke \[1\]$/,
-    // /^Program 11111111111111111111111111111111 success$/,
-    // /^Program 11111111111111111111111111111111 invoke \[1\]$/,
-    // /^Program 11111111111111111111111111111111 success$/,
-    // /^Program 11111111111111111111111111111111 invoke \[1\]$/,
-    // /^Program 11111111111111111111111111111111 success$/,
-    // /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX invoke \[1\]$/,
-    // /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX consumed \d+ of \d+ compute units$/,
-    // /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX success$/,
-    //NEXT DOESN'T WORK IT IS RAYDIUM IDO
+    /^Program 11111111111111111111111111111111 invoke \[1\]$/,
+    /^Program 11111111111111111111111111111111 success$/,
+    /^Program 11111111111111111111111111111111 invoke \[1\]$/,
+    /^Program 11111111111111111111111111111111 success$/,
+    /^Program 11111111111111111111111111111111 invoke \[1\]$/,
+    /^Program 11111111111111111111111111111111 success$/,
+    /^Program 11111111111111111111111111111111 invoke \[1\]$/,
+    /^Program 11111111111111111111111111111111 success$/,
+    /^Program 11111111111111111111111111111111 invoke \[1\]$/,
+    /^Program 11111111111111111111111111111111 success$/,
+    /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX invoke \[1\]$/,
+    /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX consumed \d+ of \d+ compute units$/,
+    /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX success$/,
+];
+const expectedLogPatternsRaydiumIDO = [
     /^Program ComputeBudget111111111111111111111111111111 invoke \[1\]$/,
     /^Program ComputeBudget111111111111111111111111111111 success$/,
     /^Program ComputeBudget111111111111111111111111111111 invoke \[1\]$/,
@@ -131,6 +133,7 @@ const expectedLogPatterns = [
     /^Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success$/,
 ];
 let counter = 0;
+const accountsToWatch: string[] = [];
 const labels = [
     'Market',
     'Request queue',
@@ -161,82 +164,84 @@ async function requestTransaction(signature: string) {
 
     try {
         let response = await axios.post(url, data, { headers });
-        let iterLabels = response.data.result.transaction.message.instructions[5].accounts;
-        for (let i = 0; i < iterLabels.length - 1; i++) {
-        console.log(`${labels[i].padEnd(15)} : ${response.data.result.transaction.message.accountKeys[iterLabels[i]]}`);
-        }
+        console.log(response.data.result.transaction.message);
+        // let iterLabels = response.data.result.transaction.message.instructions[5].accounts;
+        // for (let i = 0; i < iterLabels.length - 1; i++) {
+        //     console.log(`${labels[i].padEnd(15)} : ${response.data.result.transaction.message.accountKeys[iterLabels[i]]}`);
+        // }
     } catch (error) {
         console.error('ERROR');
     }
 }
 
-function sendRequest(ws: WebSocket) {
-    const request = {
-        jsonrpc: "2.0",
-        id: 420,
-        method: "transactionSubscribe",
-        params: [
-            {
-                vote: false,
-                failed: false,
-                accountInclude: [],
-                accountRequired: [SysvarRent, Serum, AssociatedTokenAccountProgram],
-                accountExclude: [Sage, SwitchBoardV2]
-            },
-            {
-                commitment: "processed",
-                encoding: "base64",
-                transaction_details: "full",
-                showRewards: false,
-                maxSupportedRransactionVersion: 0
-            }
-        ]
-    };
-    ws.send(JSON.stringify(request));
-}
+requestTransaction("37QQwhsJTSaJoKVyHBbXvBBMTGBNoDEetjRMQyfegnuHGoT9WJUeMbLPmC4pEFU6ZBoPGmKZUp8FwG6RmihNnCkg");
 
-ws.on('open', function open() {
-    console.log('WebSocket is open\n');
-    sendRequest(ws);
-});
-function pauseFor(milliseconds: number): Promise<void> {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve();
-        }, milliseconds);
-    });
-}
-ws.on('message', async function incoming(data) {
-    const messageStr = data.toString('utf8');
-    try {
-        const messageObj = JSON.parse(messageStr);
-        if (messageObj.method === 'transactionNotification') {
-            const result = messageObj.params.result;
-            const transactionObject = result.transaction;
-            if (transactionObject && transactionObject.meta && transactionObject.meta.logMessages) {
-                const logMessages = transactionObject.meta.logMessages;
-                const isExpectedSequence = expectedLogPatterns.every((pattern, index) => pattern.test(logMessages[index]));
-                if (isExpectedSequence) {
-                    let currentDate = new Date();
-                    let formattedTime = currentDate.toTimeString().slice(0, 8);
-                    counter += 1;
-                    console.log(`Transaction n°${counter}\nTime : ${formattedTime}\nSignature : ${result.signature}\n`);
-                    await pauseFor(2000);
-                    console.log("Pubkeys for transaction : ", result.signature);
-                    requestTransaction(result.signature);
-                    console.log("\n\n");
-                }
-            }
-        }
-    } catch (e) {
-        console.error('Failed to parse JSON:', e);
-    }
-});
+// function sendRequest(ws: WebSocket) {
+//     const request = {
+//         jsonrpc: "2.0",
+//         id: 420,
+//         method: "transactionSubscribe",
+//         params: [
+//             {
+//                 vote: false,
+//                 failed: false,
+//                 accountInclude: [],
+//                 accountRequired: [],
+//                 accountExclude: []
+//             },
+//             {
+//                 commitment: "processed",
+//                 encoding: "json",
+//                 transaction_details: "full",
+//                 showRewards: false,
+//                 maxSupportedRransactionVersion: 0
+//             }
+//         ]
+//     };
+//     ws.send(JSON.stringify(request));
+// }
 
-ws.on('error', function error(err) {
-    console.error('WebSocket error:', err);
-});
+// ws.on('open', function open() {
+//     console.log('WebSocket is open\n');
+//     sendRequest(ws);
+// });
 
-ws.on('close', function close() {
-    console.log('WebSocket is closed');
-});
+// function pauseFor(milliseconds: number): Promise<void> {
+//     return new Promise(resolve => {
+//         setTimeout(() => {
+//             resolve();
+//         }, milliseconds);
+//     });
+// }
+
+// ws.on('message', async function incoming(data) {
+//     const messageStr = data.toString('utf8');
+//     try {
+//         const messageObj = JSON.parse(messageStr);
+//         if (messageObj.method === 'transactionNotification') {
+//             const result = messageObj.params.result;
+//             if (result && result.transaction) {
+//                 const transactionObject = result.transaction;
+//                 const logMessages = transactionObject.meta.logMessages;
+//                 const signer = transactionObject.transaction.message.accountKeys[0];
+//                 const isExpectedSequence = expectedLogPatterns.every((pattern, index) => pattern.test(logMessages[index]));
+//                 if (isExpectedSequence) {
+//                     let currentDate = new Date();
+//                     let formattedTime = currentDate.toTimeString().slice(0, 8);
+//                     counter += 1;
+//                     console.log(`Transaction n°${counter}\nTime : ${formattedTime}\nSignature : ${result.signature}\nSigner : ${signer}\n\n`);
+//                     accountsToWatch.push(signer);
+//                     // const associatedTokenAddress = await getAssociatedTokenAddress(mint, owner, true);
+//                 } else if (accountsToWatch.includes(signer)){
+//                     console.log(`\nNew transaction from watched account ${signer} : ${result.signature}\n\n`);
+//                 }
+//             }
+//         }
+//     } catch (e) {
+//         console.error('Failed to parse JSON:', e);
+//     }
+// });
+
+// ws.on('error', function error(err) {
+//     console.error('WebSocket error:', err);
+// });
