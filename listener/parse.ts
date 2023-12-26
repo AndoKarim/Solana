@@ -1,5 +1,13 @@
-const url = "https://api.helius.xyz/v0/transactions/?api-key=cd855e6d-87db-449c-b018-82bc37940391";
+const fs = require("fs")
 
+const url = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/rpc_helius.json").toString());
+interface TransactionData {
+  description: string;
+  type: string;
+  source: string;
+  fee: number;
+  // ... other properties ...
+}
 const parseTransaction = async () => {
   const response = await fetch(url, {
     method: 'POST',
@@ -7,12 +15,12 @@ const parseTransaction = async () => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      transactions: ["3ChEgb7rNsYLFd5VAfimjoBx5whHnyEtiSACEKmy1Pks3jSjNfkdFz8xTHC231s8DZJn1UW4iy9Htyqc2YSGAniy"],
+      transactions: ["37QQwhsJTSaJoKVyHBbXvBBMTGBNoDEetjRMQyfegnuHGoT9WJUeMbLPmC4pEFU6ZBoPGmKZUp8FwG6RmihNnCkg"],
     }),
   });
 
-  const data = await response.json();
-  console.log(data);
+  const data = (await response.json()) as TransactionData[];
+  console.log(data[0].tokenTransfers);
 };
 
 parseTransaction();
