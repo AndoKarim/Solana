@@ -1,20 +1,12 @@
 import WebSocket from 'ws';
 import axios from 'axios';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
 const fs = require("fs")
 
 const wss_helius = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/wss_helius.json").toString());
-const url = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/rpc_helius.json").toString());
-// const url = "https://api.mainnet-beta.solana.com";
+// const url = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/rpc_helius.json").toString());
+const url = "https://api.mainnet-beta.solana.com";
 const ws = new WebSocket(wss_helius);
-const RaydiumLiquidityPoolV4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
 const RaydiumAuthorityV4 = "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1";
-const TokenProgram = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const AssociatedTokenAccountProgram = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
-const Sage = "SAGEqqFewepDHH6hMDcmWy7yjHPpyKLDnRXKb3Ki8e6";
-const SwitchBoardV2 = "SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f";
-const SysvarRent = "SysvarRent111111111111111111111111111111111";
-const RentProgram = "11111111111111111111111111111111";
 const Serum = "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX";
 const expectedLogPatternsSerumMarket = [
     /^Program 11111111111111111111111111111111 invoke \[1\]$/,
@@ -136,13 +128,7 @@ const expectedLogPatternsRaydiumIDO = [
     /^Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed \d+ of \d+ compute units$/,
     /^Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success$/,
 ];
-const regex = [
-    /^Program log: ray_log: .+$/,
-    /^Program 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8 consumed \d+ of \d+ compute units$/,
-    /^Program 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8 success$/,
-];
 let counter = 0;
-const accountsToWatch: string[] = [];
 const labels = [
     'Market',
     'Request queue',
@@ -208,19 +194,6 @@ function sendRequest(ws: WebSocket) {
     ws.send(JSON.stringify(request));
 }
 
-ws.on('open', function open() {
-    console.log('WebSocket is open\n');
-    sendRequest(ws);
-});
-
-function pauseFor(milliseconds: number): Promise<void> {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve();
-        }, milliseconds);
-    });
-}
-
 function areRegexPatternsContained(regexPatterns: RegExp[], stringList: string[]): boolean {
     let regexIndex = 0;
     let check = false;
@@ -238,7 +211,12 @@ function areRegexPatternsContained(regexPatterns: RegExp[], stringList: string[]
     }
     return false;
 }
-let check = false;
+
+ws.on('open', function open() {
+    console.log('WebSocket is open\n');
+    sendRequest(ws);
+});
+
 ws.on('message', async function incoming(data) {
     const messageStr = data.toString('utf8');
     try {
@@ -246,50 +224,42 @@ ws.on('message', async function incoming(data) {
         if (messageObj.method === 'transactionNotification') {
             const result = messageObj.params.result;
             if (result && result.transaction && result.transaction.transaction && result.transaction.transaction.message) {
-                // if (result.transaction.meta.innerInstructions[0]) {
-                //     console.log(result.transaction.meta.innerInstructions[0].instructions[0].parsed);
-                // }
-                if (check) {
-                    const checkAccounts = [RaydiumAuthorityV4, Serum, marketId[0]];
-                    let pubkeys: string[] = [];
-                    for (let i = 0 ; i < result.transaction.transaction.message.accountKeys.length ; i++) {
-                        pubkeys.push(result.transaction.transaction.message.accountKeys[i].pubkey);
-                    }
-                    if (checkAccounts.every(item => pubkeys.includes(item))) {
-                        console.log("pubkeys check. ", result.signature);
-                    }
-                    if (result.transaction.transaction.message.instructions[0]) {
-                        for (let i = 0 ; i < result.transaction.transaction.message.instructions.length ; i++) {
-                            if (result.transaction.transaction.message.instructions[i].accounts && result.transaction.transaction.message.instructions[i].accounts[0]) {
-                                let accounts: string[] = result.transaction.transaction.message.instructions[i].accounts;
-                                if (checkAccounts.every(item => accounts.includes(item))) {
-                                    console.log("accounts check. ", result.signature);
+                if (marketId.length > 0) {
+                    for (let marketIndex = 0 ; marketIndex < marketId.length ; marketIndex++) {
+                        const checkAccounts = [RaydiumAuthorityV4, Serum, marketId[marketIndex]];
+                        let pubkeys: string[] = [];
+                        for (let i = 0 ; i < result.transaction.transaction.message.accountKeys.length ; i++) {
+                            pubkeys.push(result.transaction.transaction.message.accountKeys[i].pubkey);
+                        }
+                        if (checkAccounts.every(item => pubkeys.includes(item))) {
+                            console.log(`!!! POOL OPENED FOR ${marketId[marketIndex]}\nFirst swap : ${result.signature}\nPubkeys method !!!`);
+                            marketId.splice(marketIndex, 1);
+                        }
+                        if (result.transaction.transaction.message.instructions[0]) {
+                            for (let i = 0 ; i < result.transaction.transaction.message.instructions.length ; i++) {
+                                if (result.transaction.transaction.message.instructions[i].accounts && result.transaction.transaction.message.instructions[i].accounts[0]) {
+                                    let accounts: string[] = result.transaction.transaction.message.instructions[i].accounts;
+                                    if (checkAccounts.every(item => accounts.includes(item))) {
+                                        console.log(`!!! POOL OPENED FOR ${marketId[marketIndex]}\nFirst swap : ${result.signature}\nAccounts method !!!`);
+                                        marketId.splice(marketIndex, 1);
+                                    }
                                 }
                             }
                         }
                     }
-                } else {
-                    const transactionObject = result.transaction;
-                    const logMessages = transactionObject.meta.logMessages;
-                    const signer = transactionObject.transaction.message.accountKeys[0].pubkey;
-                    // if (areRegexPatternsContained(regex, logMessages)) {
-                    //     console.log(result.signature);
-                    // }
-                    const isExpectedSequence = expectedLogPatternsSerumMarket.every((pattern, index) => pattern.test(logMessages[index]));
-                    if (isExpectedSequence) {
-                        let currentDate = new Date();
-                        let formattedTime = currentDate.toTimeString().slice(0, 8);
-                        counter += 1;
-                        console.log(`Transaction n°${counter}\nTime : ${formattedTime}\nSignature : ${result.signature}\nSigner : ${signer}\n\n`);
-                        requestTransaction(result.signature);
-                        check = true;
-                    }
-                    //     accountsToWatch.push(signer);
-                    //     // const associatedTokenAddress = await getAssociatedTokenAddress(mint, owner, true);
-                    // } else if (accountsToWatch.includes(signer)){
-                    //     console.log(`\nNew transaction from watched account ${signer} : ${result.signature}\n\n`);
-                    // }
-            }
+                }
+                const transactionObject = result.transaction;
+                const logMessages = transactionObject.meta.logMessages;
+                const signer = transactionObject.transaction.message.accountKeys[0].pubkey;
+                const isExpectedSequence = expectedLogPatternsSerumMarket.every((pattern, index) => pattern.test(logMessages[index]));
+                if (isExpectedSequence) {
+                    let currentDate = new Date();
+                    let formattedTime = currentDate.toTimeString().slice(0, 8);
+                    counter += 1;
+                    let market = result.transaction.transaction.message.instructions[5].accounts[0];
+                    marketId.push(market);
+                    console.log(`Transaction n°${counter}\nTime : ${formattedTime}\nSignature : ${result.signature}\nSigner : ${signer}\nMarket ID : ${market}\n\n`);
+                }
             }
         }
     } catch (e) {
