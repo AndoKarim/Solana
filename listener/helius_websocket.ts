@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import axios from 'axios';
-const fs = require("fs")
+import * as fs from 'fs';
 
 const wss_helius = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/wss_helius.json").toString());
 // const url = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/rpc_helius.json").toString());
@@ -129,6 +129,7 @@ const expectedLogPatternsRaydiumIDO = [
     /^Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success$/,
 ];
 let counter = 0;
+let poolCounter = 0;
 const labels = [
     'Market',
     'Request queue',
@@ -144,6 +145,21 @@ const headers = {
     'Content-Type': 'application/json',
 };
 const marketId: string[] = [];
+interface RaydiumSwapPubkeys {
+    amm_id: String,
+    amm_open_orders: String,
+    amm_target_orders: String,
+    pool_coin_token_account: String,
+    pool_pc_token_account: String,
+    serum_market: String,
+    serum_bids: String,
+    serum_asks: String,
+    serum_event_queue: String,
+    serum_coin_vault_account: String,
+    serum_pc_vault_account: String,
+    serum_vault_signer: String,
+    mint: String
+}
 
 async function requestTransaction(signature: string) {
     let data = {
@@ -158,11 +174,10 @@ async function requestTransaction(signature: string) {
 
     try {
         let response = await axios.post(url, data, { headers });
-        marketId.push(response.data.result.transaction.message.accountKeys[response.data.result.transaction.message.instructions[5].accounts[0]]);
-        // let iterLabels = response.data.result.transaction.message.instructions[5].accounts;
-        // for (let i = 0; i < iterLabels.length - 1; i++) {
-        //     console.log(`${labels[i].padEnd(15)} : ${response.data.result.transaction.message.accountKeys[iterLabels[i]]}`);
-        // }
+        let iterLabels = response.data.result.transaction.message.instructions[5].accounts;
+        for (let i = 0; i < iterLabels.length - 1; i++) {
+            console.log(`${labels[i].padEnd(15)} : ${response.data.result.transaction.message.accountKeys[iterLabels[i]]}`);
+        }
     } catch (error) {
         console.error('ERROR');
     }
@@ -224,41 +239,48 @@ ws.on('message', async function incoming(data) {
         if (messageObj.method === 'transactionNotification') {
             const result = messageObj.params.result;
             if (result && result.transaction && result.transaction.transaction && result.transaction.transaction.message) {
+                let currentDate = new Date();
+                let formattedTime = currentDate.toTimeString().slice(0, 8);
                 if (marketId.length > 0) {
+                    let pubkeys: string[] = [];
+                    for (let i = 0 ; i < result.transaction.transaction.message.accountKeys.length ; i++) {
+                        pubkeys.push(result.transaction.transaction.message.accountKeys[i].pubkey);
+                    }
                     for (let marketIndex = 0 ; marketIndex < marketId.length ; marketIndex++) {
+                        if (marketId[marketIndex] == "") { continue; }
                         const checkAccounts = [RaydiumAuthorityV4, Serum, marketId[marketIndex]];
-                        let pubkeys: string[] = [];
-                        for (let i = 0 ; i < result.transaction.transaction.message.accountKeys.length ; i++) {
-                            pubkeys.push(result.transaction.transaction.message.accountKeys[i].pubkey);
-                        }
                         if (checkAccounts.every(item => pubkeys.includes(item))) {
-                            console.log(`!!! POOL OPENED FOR ${marketId[marketIndex]}\nFirst swap : ${result.signature}\nPubkeys method !!!`);
-                            marketId.splice(marketIndex, 1);
-                        }
-                        if (result.transaction.transaction.message.instructions[0]) {
-                            for (let i = 0 ; i < result.transaction.transaction.message.instructions.length ; i++) {
-                                if (result.transaction.transaction.message.instructions[i].accounts && result.transaction.transaction.message.instructions[i].accounts[0]) {
-                                    let accounts: string[] = result.transaction.transaction.message.instructions[i].accounts;
-                                    if (checkAccounts.every(item => accounts.includes(item))) {
-                                        console.log(`!!! POOL OPENED FOR ${marketId[marketIndex]}\nFirst swap : ${result.signature}\nAccounts method !!!`);
-                                        marketId.splice(marketIndex, 1);
-                                    }
-                                }
-                            }
+                            poolCounter++;
+                            console.log(`!!! NEW POOL ${formattedTime} !!!\nSignature : ${result.signature}\n\n`);
+                            const swap_pubkeys: RaydiumSwapPubkeys = {
+                                amm_id: result.transaction.transaction.message.accountKeys[2].pubkey,
+                                amm_open_orders: result.transaction.transaction.message.accountKeys[3].pubkey,
+                                amm_target_orders: result.transaction.transaction.message.accountKeys[4].pubkey,
+                                pool_coin_token_account: result.transaction.transaction.message.accountKeys[5].pubkey,
+                                pool_pc_token_account: result.transaction.transaction.message.accountKeys[6].pubkey,
+                                serum_market: result.transaction.transaction.message.accountKeys[7].pubkey,
+                                serum_bids: result.transaction.transaction.message.accountKeys[8].pubkey,
+                                serum_asks: result.transaction.transaction.message.accountKeys[9].pubkey,
+                                serum_event_queue: result.transaction.transaction.message.accountKeys[10].pubkey,
+                                serum_coin_vault_account: result.transaction.transaction.message.accountKeys[11].pubkey,
+                                serum_pc_vault_account: result.transaction.transaction.message.accountKeys[12].pubkey,
+                                serum_vault_signer: result.transaction.transaction.message.accountKeys[20].pubkey,
+                                mint: result.transaction.transaction.message.accountKeys[14].pubkey
+                            };
+                            const jsonString: string = JSON.stringify(swap_pubkeys, null, 4);
+                            fs.writeFileSync(`${poolCounter}.json`, jsonString, 'utf-8');
+                            marketId[marketIndex] = "";
                         }
                     }
                 }
                 const transactionObject = result.transaction;
                 const logMessages = transactionObject.meta.logMessages;
-                const signer = transactionObject.transaction.message.accountKeys[0].pubkey;
                 const isExpectedSequence = expectedLogPatternsSerumMarket.every((pattern, index) => pattern.test(logMessages[index]));
                 if (isExpectedSequence) {
-                    let currentDate = new Date();
-                    let formattedTime = currentDate.toTimeString().slice(0, 8);
                     counter += 1;
                     let market = result.transaction.transaction.message.instructions[5].accounts[0];
                     marketId.push(market);
-                    console.log(`Transaction n°${counter}\nTime : ${formattedTime}\nSignature : ${result.signature}\nSigner : ${signer}\nMarket ID : ${market}\n\n`);
+                    console.log(`Transaction n°${counter}\nTime : ${formattedTime}\nSignature : ${result.signature}\n\n`);
                 }
             }
         }
@@ -270,3 +292,14 @@ ws.on('message', async function incoming(data) {
 ws.on('error', function error(err) {
     console.error('WebSocket error:', err);
 });
+                        // if (result.transaction.transaction.message.instructions[0]) {
+                        //     for (let i = 0 ; i < result.transaction.transaction.message.instructions.length ; i++) {
+                        //         if (result.transaction.transaction.message.instructions[i].accounts && result.transaction.transaction.message.instructions[i].accounts[0]) {
+                        //             let accounts: string[] = result.transaction.transaction.message.instructions[i].accounts;
+                        //             if (checkAccounts.every(item => accounts.includes(item))) {
+                        //                 console.log(`!!! POOL OPENED FOR ${marketId[marketIndex]}\nFirst swap : ${result.signature}\nAccounts method !!!`);
+                        //                 marketId.splice(marketIndex, 1);
+                        //             }
+                        //         }
+                        //     }
+                        // }

@@ -14,3 +14,5 @@ solana-sdk = "1.9.5"
 anyhow = "1.0.53"
 spl-token = { version = "3.2.0", features = ["no-entrypoint"], default-features = false }
 spl-associated-token-account = "1.0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
