@@ -8,7 +8,7 @@ function sendRequest(ws: WebSocket) {
         id: 420,
         method: "accountSubscribe",
         params: [
-            "63dNoHqwqb5Mm4kAhJMrdikPydK9tMxTgCDMGDTtyjMf",
+            "HT4Rqhskg2xiBFVJV1kB19jMbSPdEfgRWpepSx6XoYi",
             {
                 encoding: "jsonParsed",
                 commitment: "confirmed",
@@ -35,7 +35,7 @@ ws.on('message', function incoming(data) {
     }
 });
 
-ws.on('error', function error(err) {
+ws.on('error', function error(err) {    
     console.error('WebSocket error:', err);
 });
 

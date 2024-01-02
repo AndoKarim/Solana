@@ -1,4 +1,4 @@
-const fs = require("fs")
+import * as fs from 'fs';
 
 const url = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/rpc_helius.json").toString());
 interface TransactionData {
@@ -20,7 +20,7 @@ const parseTransaction = async () => {
   });
 
   const data = (await response.json()) as TransactionData[];
-  console.log(data[0].tokenTransfers);
+  console.log(data);
 };
 
 parseTransaction();
