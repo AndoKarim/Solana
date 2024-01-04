@@ -255,8 +255,8 @@ async function requestTransactionRaydium(signature: string) {
           const jsonString: string = JSON.stringify(swap_pubkeys, null, 4);
           poolCounter++;
           fs.writeFileSync(`poolsjson/${poolCounter}.json`, jsonString, 'utf-8');
-          priceAction.push([accounts[keys[16]], (response.data.result.meta.postTokenBalances[1].uiTokenAmount.uiAmount / response.data.result.meta.postTokenBalances[0].uiTokenAmount.uiAmount).toString(), serumPubkeys[i][6]]);
-          // console.log(`NEW POOL (${poolCounter}) at ${(new Date).toTimeString().slice(0, 8)}\nSignature : ${response.data.result.transaction.signatures}\n`);
+          priceAction.push([accounts[keys[16]], (response.data.result.meta.postTokenBalances[1].uiTokenAmount.uiAmount / response.data.result.meta.postTokenBalances[0].uiTokenAmount.uiAmount).toString(), (response.data.result.meta.postTokenBalances[0].uiTokenAmount.decimals).toString(), serumPubkeys[i][6]]);
+          console.log(`NEW POOL (${poolCounter}) at ${(new Date).toTimeString().slice(0, 8)}\nSignature : ${response.data.result.transaction.signatures}\n`);
           serumPubkeys[i][0] = "null";
         }
       }
@@ -274,7 +274,7 @@ connection.onLogs(
           let logMessages = data.logs;
           let isExpectedSequence = expectedLogPatternsSerumMarket.every((pattern, index) => pattern.test(logMessages[index]));
           if (isExpectedSequence) {
-            // console.log(`Serum init at ${(new Date).toTimeString().slice(0, 8)}\nSignature : ${data.signature}\n`);
+            console.log(`Serum init at ${(new Date).toTimeString().slice(0, 8)}\nSignature : ${data.signature}\n`);
             requestTransactionSerum(data.signature);
           }
           isExpectedSequence = expectedLogPatternsRaydiumIDO.every((pattern, index) => pattern.test(logMessages[index]));
@@ -354,10 +354,9 @@ ws.on('open', function open() {
   sendRequest(ws);
 });
 let checker = -1;
-let mult = 5;
+let mult = 1;
 let multiplier = 0;
 let charting: number[] = [];
-let time: string[] = [];
 ws.on('message', async function incoming(data) {
   const messageStr = data.toString('utf8');
   try {
@@ -370,47 +369,45 @@ ws.on('message', async function incoming(data) {
               pubkeys.push(result.transaction.transaction.message.accountKeys[i].pubkey);
             }
             for (let k = 0 ; k < priceAction.length ; k++) {
-              if (checker >= 0) {
-                k = checker;
-              }
-              if (pubkeys.includes(priceAction[k][0])) {
-                if (checker < 0) {
+              if (checker >= 0 || pubkeys.includes(priceAction[k][0])) {
+                if (checker >= 0) {
+                  k = checker;
+                } else {
                   console.log("checked for : ", priceAction[k][0]);
                   checker = k;
                   multiplier = mult / +priceAction[k][1];
                   charting.push(Math.round(+priceAction[k][1] * multiplier));
                 }
-                let indexSol = 0;
-                let indexShitcoin = 0;
-                let prebalanceSol = 0;
-                let postbalanceSol = 0;
-                let prebalanceShitcoin = 0;
-                let postbalanceShitcoin = 0;
+                let sol = 0;
+                let shitcoin = 0;
+                let index = 0;
                 for (let i = 0 ; i < result.transaction.meta.preTokenBalances.length ; i++) {
-                  if (result.transaction.meta.preTokenBalances[i].owner == "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1") {
-                    if (result.transaction.meta.preTokenBalances[i].mint == "So11111111111111111111111111111111111111112") {
-                      indexSol = result.transaction.meta.preTokenBalances[i].accountIndex;
-                      prebalanceSol += result.transaction.meta.preTokenBalances[i].uiTokenAmount.uiAmount;
-                    } else if (result.transaction.meta.preTokenBalances[i].mint == priceAction[k][2]) {
-                      indexShitcoin = result.transaction.meta.preTokenBalances[i].accountIndex;
-                      prebalanceShitcoin += result.transaction.meta.preTokenBalances[i].uiTokenAmount.uiAmount;
-                    }
+                  if (result.transaction.meta.preTokenBalances[i].mint == priceAction[k][3] && result.transaction.meta.preTokenBalances[i].owner == result.transaction.transaction.message.accountKeys[0].pubkey) {
+                    index = result.transaction.meta.preTokenBalances[i].accountIndex;
+                    shitcoin = result.transaction.meta.preTokenBalances[i].uiTokenAmount.uiAmount;
                   }
                 }
                 for (let i = 0 ; i < result.transaction.meta.postTokenBalances.length ; i++) {
-                  if (result.transaction.meta.postTokenBalances[i].accountIndex == indexSol) {
-                    postbalanceSol += result.transaction.meta.postTokenBalances[i].uiTokenAmount.uiAmount;
-                  } else if (result.transaction.meta.postTokenBalances[i].accountIndex == indexShitcoin) {
-                    postbalanceShitcoin += result.transaction.meta.postTokenBalances[i].uiTokenAmount.uiAmount;
+                  if (result.transaction.meta.postTokenBalances[i].accountIndex == index) {
+                    shitcoin = Math.abs(shitcoin - result.transaction.meta.postTokenBalances[i].uiTokenAmount.uiAmount);
                   }
                 }
-                time.push((new Date).toTimeString().slice(0, 8));
-                const jsonString = JSON.stringify(time);
-                fs.writeFileSync(`poolsjson/time.json`, jsonString);
-                charting.push(Math.round((Math.abs(postbalanceSol - prebalanceSol) / Math.abs(postbalanceShitcoin - prebalanceShitcoin)) * multiplier));
-                let flush = "\n".repeat(50);
-                console.log(flush);
-                chart(charting, mult);
+                for (let i = 0 ; i < result.transaction.meta.preTokenBalances.length ; i++) {
+                  if (result.transaction.meta.preTokenBalances[i].mint == 'So11111111111111111111111111111111111111112') {
+                    index = result.transaction.meta.preTokenBalances[i].accountIndex;
+                    sol =  result.transaction.meta.preTokenBalances[i].uiTokenAmount.uiAmount;
+                  }
+                }
+                for (let i = 0 ; i < result.transaction.meta.postTokenBalances.length ; i++) {
+                  if (result.transaction.meta.postTokenBalances[i].accountIndex == index) {
+                    sol = Math.abs(sol - result.transaction.meta.postTokenBalances[i].uiTokenAmount.uiAmount);
+                  }
+                }
+                charting.push(Math.round((shitcoin / sol) * multiplier));
+                console.log(charting);
+                // let flush = "\n".repeat(50);
+                // console.log(flush);
+                // chart(charting, mult);
               }
               if (checker >= 0) {
                 k = priceAction.length;
