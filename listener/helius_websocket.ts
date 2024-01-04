@@ -143,7 +143,6 @@ function areRegexPatternsContained(regexPatterns: RegExp[], stringList: string[]
 }
 
 ws.on('open', function open() {
-    console.log('WebSocket is open\n');
     sendRequest(ws);
 });
 
@@ -207,14 +206,3 @@ ws.on('message', async function incoming(data) {
 ws.on('error', function error(err) {
     console.error('WebSocket error:', err);
 });
-                        // if (result.transaction.transaction.message.instructions[0]) {
-                        //     for (let i = 0 ; i < result.transaction.transaction.message.instructions.length ; i++) {
-                        //         if (result.transaction.transaction.message.instructions[i].accounts && result.transaction.transaction.message.instructions[i].accounts[0]) {
-                        //             let accounts: string[] = result.transaction.transaction.message.instructions[i].accounts;
-                        //             if (checkAccounts.every(item => accounts.includes(item))) {
-                        //                 console.log(`!!! POOL OPENED FOR ${marketId[marketIndex]}\nFirst swap : ${result.signature}\nAccounts method !!!`);
-                        //                 marketId.splice(marketIndex, 1);
-                        //             }
-                        //         }
-                        //     }
-                        // }

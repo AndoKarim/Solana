@@ -1,8 +1,11 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import axios from 'axios';
+import WebSocket from 'ws';
 import * as fs from 'fs';
 
-const url = "https://api.mainnet-beta.solana.com";
+const url = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/rpc_helius.json").toString());
+const wss_helius = JSON.parse(fs.readFileSync("/home/quarch/solana/listener/wss_helius.json").toString());
+const ws = new WebSocket(wss_helius);
 const connection = new Connection(url);
 const expectedLogPatternsRaydiumIDO = [
   /^Program ComputeBudget111111111111111111111111111111 invoke \[1\]$/,
@@ -131,6 +134,7 @@ const expectedLogPatternsSerumMarket = [
   /^Program srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX success$/,
 ];
 const Serum = new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
+const RaydiumAuthorityV4 = "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1";
 let poolCounter = 0;
 interface RaydiumSwapPubkeys {
   amm_id: String,
@@ -151,6 +155,7 @@ const headers = {
   'Content-Type': 'application/json',
 };
 let serumPubkeys: string[][] = [];
+let priceAction: string[][] = [];
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -175,7 +180,7 @@ async function getVaultSigner(account: string): Promise<string> {
     const response = await axios.post(url, data, { headers });
     return response.data.result.value.data.parsed.info.owner;
   } catch (error) {
-    console.error('Error:', error);
+    console.error('getvaultSigner error :', error);
     return("error");
   }
 }
@@ -193,16 +198,17 @@ async function requestTransactionSerum(signature: string) {
 
   try {
       let response = await axios.post(url, data, { headers });
-      for (let i = 0 ; i < 10 ; i++) {
+      for (let i = 0 ; i < 5 ; i++) {
         if (!response || !response.data || !response.data.result) {
-          console.log("delaying");
-          delay(1000);
+          response = await axios.post(url, data, { headers });
+          delay(500);
         }
       }
       let accounts = response.data.result.transaction.message.accountKeys;
-      serumPubkeys.push([accounts[1], accounts[6], accounts[4], accounts[5], accounts[3], accounts[6], accounts[7], accounts[11]])
+      let keys = response.data.result.transaction.message.instructions[5].accounts;
+      serumPubkeys.push([accounts[keys[0]], accounts[keys[3]], accounts[keys[4]], accounts[keys[2]], accounts[keys[5]], accounts[keys[6]], accounts[keys[7]]])
   } catch (error) {
-      console.error('ERROR : ', error);
+      console.error('requestTransactionSerum error : ', error);
   }
 }
 
@@ -218,37 +224,44 @@ async function requestTransactionRaydium(signature: string) {
   };
 
   try {
-      console.log("or there");
       let response = await axios.post(url, data, { headers });
+      for (let i = 0 ; i < 5 ; i++) {
+        if (!response || !response.data || !response.data.result || !response.data.result.transaction || !response.data.result.transaction.message) {
+          response = await axios.post(url, data, { headers });
+          delay(500);
+        }
+      }
       let accounts = response.data.result.transaction.message.accountKeys;
+      let keys = response.data.result.transaction.message.instructions[4].accounts;
       for (let i = 0 ; i < serumPubkeys.length ; i++) {
-        if (accounts[19] == serumPubkeys[i][0]) {
-          let vault_signer = await getVaultSigner(serumPubkeys[i][1]);
+        if (accounts[keys[16]] == serumPubkeys[i][0]) {
+          let vault_signer = await getVaultSigner(serumPubkeys[i][4]);
           if (vault_signer == "error") { break }
           const swap_pubkeys: RaydiumSwapPubkeys = {
-            amm_id: accounts[2],
-            amm_open_orders: accounts[3],
-            amm_target_orders: accounts[7],
-            pool_coin_token_account: accounts[5],
-            pool_pc_token_account: accounts[6],
-            serum_market: accounts[19],
-            serum_bids: serumPubkeys[i][2],
-            serum_asks: serumPubkeys[i][3],
-            serum_event_queue: serumPubkeys[i][4],
-            serum_coin_vault_account: serumPubkeys[i][5],
-            serum_pc_vault_account: serumPubkeys[i][6],
+            amm_id: accounts[keys[4]],
+            amm_open_orders: accounts[keys[6]],
+            amm_target_orders: accounts[keys[12]],
+            pool_coin_token_account: accounts[keys[10]],
+            pool_pc_token_account: accounts[keys[11]],
+            serum_market: accounts[keys[16]],
+            serum_bids: serumPubkeys[i][1],
+            serum_asks: serumPubkeys[i][2],
+            serum_event_queue: serumPubkeys[i][3],
+            serum_coin_vault_account: serumPubkeys[i][4],
+            serum_pc_vault_account: serumPubkeys[i][5],
             serum_vault_signer: vault_signer,
-            mint: serumPubkeys[i][7]
+            mint: serumPubkeys[i][6]
           };
           const jsonString: string = JSON.stringify(swap_pubkeys, null, 4);
           poolCounter++;
-          fs.writeFileSync(`${poolCounter}.json`, jsonString, 'utf-8');
-          console.log(`NEW POOL (${poolCounter}) at ${(new Date).toTimeString().slice(0, 8)}\nSignature : ${response.data}\n`);
+          fs.writeFileSync(`poolsjson/${poolCounter}.json`, jsonString, 'utf-8');
+          priceAction.push([accounts[keys[16]], (response.data.result.meta.postTokenBalances[1].uiTokenAmount.uiAmount / response.data.result.meta.postTokenBalances[0].uiTokenAmount.uiAmount).toString(), (response.data.result.meta.postTokenBalances[0].uiTokenAmount.decimals).toString(), serumPubkeys[i][6]]);
+          console.log(`NEW POOL (${poolCounter}) at ${(new Date).toTimeString().slice(0, 8)}\nSignature : ${response.data.result.transaction.signatures}\n`);
           serumPubkeys[i][0] = "null";
         }
       }
   } catch (error) {
-      console.error('ERROR : ', error);
+      console.error('requestTransactionRaydium error : ', error);
   }
 }
 
@@ -270,8 +283,143 @@ connection.onLogs(
           }
         }
       } catch (e) {
-      console.error('Caught error : ', e);
+      console.error('onLogs error : ', e);
       }
     },
   "confirmed"
 );
+
+function chart(price: number[], multiplier: number): void {
+  let row = '';
+  for (let i = 0; i < 50; i++) {
+      for (let j = 0; j < price.length; j++) {
+          if (j == 0) {
+              if (price[j] >= (50 - i)) {
+                  row += ' \u25A0';
+              } else {
+                  row += '  ';
+              }
+          } else {
+              if (price[j] >= price[j - 1]) {
+                  if (price[j] >= (50 - i) && price[j - 1] < (51 - i)) {
+                      row += ' \u25A0';
+                  } else {
+                      row += '  ';
+                  }
+              } else {
+                  if (price[j] <= (50 - i) && price[j - 1] > (49 - i)) {
+                      row += ' \u25A0';
+                  } else {
+                      row += '  ';
+                  }
+              }
+          }
+      }
+      if (price.length > 1 && price[price.length - 1] == (50 - i)) {
+          row += ' +';
+          row += ((49 - i) * (100 / multiplier)).toString();
+          row += '%';
+      }
+      row += '\n';
+  }
+  console.log(row);
+}
+
+function sendRequest(ws: WebSocket) {
+  const request = {
+      jsonrpc: "2.0",
+      id: 420,
+      method: "transactionSubscribe",
+      params: [
+          {
+              vote: false,
+              failed: false,
+              accountInclude: [],
+              accountRequired: [Serum, RaydiumAuthorityV4],
+              accountExclude: []
+          },
+          {
+              commitment: "confirmed",
+              encoding: "jsonParsed",
+              transaction_details: "full",
+              showRewards: false,
+              maxSupportedRransactionVersion: 0
+          }
+      ]
+  };
+  ws.send(JSON.stringify(request));
+}
+
+ws.on('open', function open() {
+  sendRequest(ws);
+});
+let checker = -1;
+let mult = 1;
+let multiplier = 0;
+let charting: number[] = [];
+ws.on('message', async function incoming(data) {
+  const messageStr = data.toString('utf8');
+  try {
+      const messageObj = JSON.parse(messageStr);
+      if (messageObj.method === 'transactionNotification') {
+          const result = messageObj.params.result;
+          if (result && result.transaction) {
+            let pubkeys: string[] = [];
+            for (let i = 0 ; i < result.transaction.transaction.message.accountKeys.length ; i++) {
+              pubkeys.push(result.transaction.transaction.message.accountKeys[i].pubkey);
+            }
+            for (let k = 0 ; k < priceAction.length ; k++) {
+              if (checker >= 0 || pubkeys.includes(priceAction[k][0])) {
+                if (checker >= 0) {
+                  k = checker;
+                } else {
+                  console.log("checked for : ", priceAction[k][0]);
+                  checker = k;
+                  multiplier = mult / +priceAction[k][1];
+                  charting.push(Math.round(+priceAction[k][1] * multiplier));
+                }
+                let sol = 0;
+                let shitcoin = 0;
+                let index = 0;
+                for (let i = 0 ; i < result.transaction.meta.preTokenBalances.length ; i++) {
+                  if (result.transaction.meta.preTokenBalances[i].mint == priceAction[k][3] && result.transaction.meta.preTokenBalances[i].owner == result.transaction.transaction.message.accountKeys[0].pubkey) {
+                    index = result.transaction.meta.preTokenBalances[i].accountIndex;
+                    shitcoin = result.transaction.meta.preTokenBalances[i].uiTokenAmount.uiAmount;
+                  }
+                }
+                for (let i = 0 ; i < result.transaction.meta.postTokenBalances.length ; i++) {
+                  if (result.transaction.meta.postTokenBalances[i].accountIndex == index) {
+                    shitcoin = Math.abs(shitcoin - result.transaction.meta.postTokenBalances[i].uiTokenAmount.uiAmount);
+                  }
+                }
+                for (let i = 0 ; i < result.transaction.meta.preTokenBalances.length ; i++) {
+                  if (result.transaction.meta.preTokenBalances[i].mint == 'So11111111111111111111111111111111111111112') {
+                    index = result.transaction.meta.preTokenBalances[i].accountIndex;
+                    sol =  result.transaction.meta.preTokenBalances[i].uiTokenAmount.uiAmount;
+                  }
+                }
+                for (let i = 0 ; i < result.transaction.meta.postTokenBalances.length ; i++) {
+                  if (result.transaction.meta.postTokenBalances[i].accountIndex == index) {
+                    sol = Math.abs(sol - result.transaction.meta.postTokenBalances[i].uiTokenAmount.uiAmount);
+                  }
+                }
+                charting.push(Math.round((shitcoin / sol) * multiplier));
+                console.log(charting);
+                // let flush = "\n".repeat(50);
+                // console.log(flush);
+                // chart(charting, mult);
+              }
+              if (checker >= 0) {
+                k = priceAction.length;
+              }
+            }
+          }
+        }
+  } catch (e) {
+      console.error('ws.on error :', e);
+  }
+});
+
+ws.on('error', function error(err) {
+  console.error('WebSocket error:', err);
+});
