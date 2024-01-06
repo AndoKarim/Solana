@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 
-const ws = new WebSocket('wss://atlas-mainnet.helius-rpc.com?api-key=c1d1d8ca-636c-4bcf-a903-2d5dd45818c0');
+//Replace XXXX by your key 
+const ws = new WebSocket('wss://atlas-mainnet.helius-rpc.com?api-key=XXXX');
 
 function sendRequest(ws: WebSocket) {
     const request = {
